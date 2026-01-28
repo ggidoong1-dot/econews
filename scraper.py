@@ -35,14 +35,19 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         logger.error(f"Supabase Init Fail: {e}")
 
-# 수집 대상 국가 및 언어 설정 (이건 그대로 둠)
+# ==========================================
+# 🌍 수집 대상 국가 (프랑스, 인도, 대만 추가됨)
+# ==========================================
 TARGET_REGIONS = [
     {"code": "US", "lang": "en", "name": "미국"},
     {"code": "KR", "lang": "ko", "name": "한국"},
-    {"code": "JP", "lang": "ja", "name": "일본"},
     {"code": "CN", "lang": "zh-CN", "name": "중국"},
+    {"code": "JP", "lang": "ja", "name": "일본"},
     {"code": "DE", "lang": "de", "name": "독일"},
-    {"code": "ES", "lang": "es", "name": "스페인"},
+    {"code": "FR", "lang": "fr", "name": "프랑스"}, # 추가됨
+    {"code": "GB", "lang": "en", "name": "영국"},
+    {"code": "IN", "lang": "en", "name": "인도"},   # 추천: 신흥 시장
+    {"code": "TW", "lang": "zh-TW", "name": "대만"}, # 추천: TSMC 본거지
 ]
 
 # ==========================================
@@ -72,32 +77,34 @@ class TranslationService:
 class NewsMonitor:
     def __init__(self):
         self.translator = TranslationService()
-        self.patterns = {} # 초기화 시점에는 비워둠
+        # 한글, 한자, 히라가나/가타카나 범위 정규식
+        self.cjk_pattern = re.compile(r'[\u3131-\uD79D\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]')
+        self.patterns = {} 
+
+    def _is_cjk(self, text):
+        """키워드에 한글/한자/일본어가 포함되어 있는지 확인"""
+        return bool(self.cjk_pattern.search(text))
 
     def load_keywords_from_db(self):
-        """DB에서 키워드를 최신으로 불러와서 패턴 컴파일"""
         if not supabase: return {}
         
         try:
-            # DB에서 모든 키워드 가져오기
             response = supabase.table("search_keywords").select("*").execute()
             rows = response.data
             
-            if not rows:
-                logger.warning("DB에 키워드가 없습니다.")
-                return {}
+            if not rows: return {}
 
             mapping = {}
-            cjk_langs = ['ko', 'ja', 'zh', 'zh-CN']
             
             for row in rows:
                 category = row['category']
-                lang = row['language']
                 keyword = row['keyword']
                 
-                # 정규식 생성
-                if lang in cjk_langs:
+                # [스마트 감지 로직]
+                # 키워드 자체가 아시아권 언어라면 단어 경계(\b) 없이 검색 (예: '삼성' -> '삼성전자' 매칭됨)
+                if self._is_cjk(keyword):
                     pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+                # 영어/프랑스어 등 서구권 언어라면 단어 경계 사용 (예: 'AI' -> 'Paid' 매칭 안됨)
                 else:
                     pattern = re.compile(r'\b' + re.escape(keyword) + r'\b', re.IGNORECASE)
                 
@@ -114,7 +121,6 @@ class NewsMonitor:
         found_cats = set()
         found_keys = set()
         
-        # 키워드가 비어있으면 DB에서 로딩 시도
         if not self.patterns:
             self.load_keywords_from_db()
 
@@ -148,11 +154,11 @@ class NewsMonitor:
             title = entry.get('title', '')
             link = entry.link
             
-            # 분석
             keywords, categories = self.analyze(title)
             
             if categories:
                 final_title = title
+                # 한국어가 아니면 번역 시도
                 if lang != 'ko':
                     trans = self.translator.translate(title)
                     if trans: final_title = trans
@@ -179,13 +185,10 @@ class NewsMonitor:
                 
         return count
 
-# 전역 인스턴스
 monitor = NewsMonitor()
 
 def run_global_batch():
-    # 실행할 때마다 최신 키워드 반영을 위해 DB 다시 로드
     monitor.load_keywords_from_db()
-    
     total_saved = 0
     logs = []
     
@@ -197,12 +200,12 @@ def run_global_batch():
     
     return total_saved, logs
 
-# 키워드 관리용 함수 (main.py에서 사용)
-def add_keyword(category, lang, keyword):
+# [수정] 언어 인자 제거 (자동 처리)
+def add_keyword(category, keyword):
     if supabase:
         supabase.table("search_keywords").insert({
             "category": category,
-            "language": lang,
+            "language": "AUTO", # DB에는 그냥 AUTO라고 박아둡니다
             "keyword": keyword
         }).execute()
 
