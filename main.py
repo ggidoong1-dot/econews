@@ -1,51 +1,63 @@
 import streamlit as st
-from scraper import fetch_global_news
+import pandas as pd
+# [핵심 수정] 함수 이름 변경: fetch_global_news -> run_collector
+from scraper import run_collector, supabase
 
-# 페이지 설정
-st.set_page_config(page_title="EcoNews Pro", page_icon="🌐", layout="wide")
+st.set_page_config(page_title="EcoNews Data Dam", page_icon="🌐", layout="wide")
 
-st.title("🛡️ EcoNews: 글로벌 경제 정밀 모니터링")
-st.markdown("---")
+st.title("🛡️ EcoNews: 24h 데이터 댐 (Supabase 연동)")
+st.caption("Auto-Archiving System for Stock Prediction")
 
-# 1. 사이드바: 제어 센터
+# ---------------------------------------------------------
+# 1. 사이드바: 수집기 작동 (Trigger)
+# ---------------------------------------------------------
 with st.sidebar:
-    st.header("⚙️ 수집 및 필터링 설정")
+    st.header("🕵️‍♀️ 수집기 (Collector)")
+    st.info("버튼을 누르면 뉴스를 수집해 DB에 저장합니다.")
     
-    # 국가 선택에 따른 코드 매핑
-    country_choice = st.selectbox("수집 대상 국가", ["미국", "일본", "중국"])
-    country_map = {
-        "미국": {"lang": "en", "gl": "US"},
-        "일본": {"lang": "ja", "gl": "JP"},
-        "중국": {"lang": "zh-CN", "gl": "CN"}
-    }
+    target_country = st.selectbox("타겟 국가", ["미국 (US)", "한국 (KR)"])
     
-    # 검색 키워드 입력
-    user_query = st.text_input("검색어를 입력하세요 (예: Nvidia, Interest Rate)", "Economy")
-    
-    start_btn = st.button("🚀 정밀 모니터링 시작")
-
-# 2. 메인 화면: 뉴스 전시
-if start_btn:
-    with st.spinner(f"[{country_choice}] 뉴스 분석 및 필터링 중..."):
-        config = country_map[country_choice]
-        results = fetch_global_news(user_query, config['lang'], config['gl'])
+    if st.button("🚀 수집 및 DB 저장 시작"):
+        # 국가별 설정 매핑
+        config_map = {
+            "미국 (US)": {"lang": "en", "code": "US", "query": "Economy"},
+            "한국 (KR)": {"lang": "ko", "code": "KR", "query": "경제"}
+        }
+        cfg = config_map[target_country]
         
-        if results:
-            st.success(f"총 {len(results)}개의 핵심 기사를 발견했습니다.")
+        with st.spinner(f"[{target_country}] 뉴스 수집 및 저장 중..."):
+            # [핵심 수정] 새로운 함수 호출
+            saved_count = run_collector(cfg["query"], cfg["lang"], cfg["code"])
             
-            for item in results:
-                with st.container():
-                    # 카드 스타일 레이아웃
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.subheader(item['title'])
-                        st.caption(f"📅 {item['date']} | 🏢 {item['source']}")
-                    with col2:
-                        st.link_button("기사 원문 보기", item['link'])
-                    
-                    st.write(f"🔍 원문: {item['original']}")
-                    st.divider()
+        if saved_count > 0:
+            st.success(f"✅ {saved_count}개의 새로운 기사가 DB에 저장되었습니다!")
+            st.balloons()
         else:
-            st.warning("설정하신 핵심 키워드에 부합하는 뉴스가 현재 없습니다.")
+            st.warning("새로운 기사가 없거나, 이미 저장된 기사들입니다.")
+
+# ---------------------------------------------------------
+# 2. 메인 화면: DB 데이터 조회 (Viewer)
+# ---------------------------------------------------------
+st.divider()
+st.subheader("💾 Supabase 실시간 데이터 (최신순 50개)")
+
+if not supabase:
+    st.error("🚨 Supabase 연결 실패! Secrets 설정을 확인해주세요.")
 else:
-    st.info("사이드바에서 설정을 확인하고 [모니터링 시작] 버튼을 눌러주세요.")
+    # DB에서 데이터 가져오기 (새로고침 할 때마다 갱신)
+    try:
+        response = supabase.table("news_articles")\
+            .select("*")\
+            .order("published_at", desc=True)\
+            .limit(50)\
+            .execute()
+        
+        data = response.data
+        
+        if data:
+            # 보기 좋게 데이터프레임으로 변환
+            df = pd.DataFrame(data)
+            
+            # 주요 컬럼만 선택해서 보여주기
+            display_cols = ["title", "categories", "keywords", "country", "published_at"]
+            # 데이터에 없는 컬럼은 에러 방지를
