@@ -2,3 +2,5 @@ streamlit
 feedparser
 deep-translator
 pandas
+python-dateutil
+supabase
