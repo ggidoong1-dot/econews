@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-# [핵심 수정] 함수 이름 변경: fetch_global_news -> run_collector
+# 함수 이름이 변경되었으므로 반드시 run_collector를 가져와야 합니다.
 from scraper import run_collector, supabase
 
 st.set_page_config(page_title="EcoNews Data Dam", page_icon="🌐", layout="wide")
@@ -26,7 +26,7 @@ with st.sidebar:
         cfg = config_map[target_country]
         
         with st.spinner(f"[{target_country}] 뉴스 수집 및 저장 중..."):
-            # [핵심 수정] 새로운 함수 호출
+            # run_collector 함수 실행
             saved_count = run_collector(cfg["query"], cfg["lang"], cfg["code"])
             
         if saved_count > 0:
@@ -44,8 +44,9 @@ st.subheader("💾 Supabase 실시간 데이터 (최신순 50개)")
 if not supabase:
     st.error("🚨 Supabase 연결 실패! Secrets 설정을 확인해주세요.")
 else:
-    # DB에서 데이터 가져오기 (새로고침 할 때마다 갱신)
+    # [중요] try 블록 시작
     try:
+        # DB에서 데이터 가져오기
         response = supabase.table("news_articles")\
             .select("*")\
             .order("published_at", desc=True)\
@@ -59,5 +60,4 @@ else:
             df = pd.DataFrame(data)
             
             # 주요 컬럼만 선택해서 보여주기
-            display_cols = ["title", "categories", "keywords", "country", "published_at"]
-            # 데이터에 없는 컬럼은 에러 방지를
+            display_cols = ["title", "categories", "keywords", "country", "published
