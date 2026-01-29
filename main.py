@@ -1,125 +1,632 @@
 import streamlit as st
 import pandas as pd
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from scraper import run_global_batch, supabase, add_keyword, delete_keyword, get_all_keywords
+import plotly.express as px
+import plotly.graph_objects as go
 
-st.set_page_config(page_title="Global EcoNews Dam", page_icon="🌍", layout="wide")
+# ==========================================
+# 페이지 설정
+# ==========================================
+st.set_page_config(
+    page_title="Global Economic Intelligence Hub",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("🌍 Global EcoNews: 전 세계 경제 데이터 댐")
+# ==========================================
+# 커스텀 CSS (경제 전문 사이트 스타일)
+# ==========================================
+st.markdown("""
+<style>
+    /* 메인 배경 */
+    .main {
+        background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
+    }
+    
+    /* 헤더 스타일 */
+    .header-container {
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    .main-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: white;
+        margin: 0;
+        text-align: center;
+        letter-spacing: -0.5px;
+    }
+    
+    .subtitle {
+        font-size: 1rem;
+        color: #93c5fd;
+        text-align: center;
+        margin-top: 0.5rem;
+    }
+    
+    /* 메트릭 카드 */
+    .metric-card {
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #3b82f6;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        margin-bottom: 1rem;
+    }
+    
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #3b82f6;
+        margin: 0;
+    }
+    
+    .metric-label {
+        font-size: 0.875rem;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 0.5rem;
+    }
+    
+    /* 상태 배지 */
+    .status-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    .status-active {
+        background: #10b981;
+        color: white;
+    }
+    
+    .status-inactive {
+        background: #6b7280;
+        color: white;
+    }
+    
+    /* 데이터 테이블 */
+    .dataframe {
+        font-size: 0.9rem !important;
+    }
+    
+    /* 버튼 커스텀 */
+    .stButton>button {
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+    
+    /* 탭 스타일 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2rem;
+        background-color: transparent;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: #1e293b;
+        border-radius: 8px 8px 0 0;
+        padding: 1rem 2rem;
+        font-weight: 600;
+    }
+    
+    /* 사이드바 */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    }
+    
+    section[data-testid="stSidebar"] .element-container {
+        color: white;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["📡 수집 모니터링", "⚙️ 키워드 관리"])
+# ==========================================
+# 헤더
+# ==========================================
+st.markdown("""
+<div class="header-container">
+    <h1 class="main-title">📊 Global Economic Intelligence Hub</h1>
+    <p class="subtitle">Real-time Economic News Monitoring & Analysis Platform</p>
+</div>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# 사이드바 - 통계 및 제어
+# ==========================================
+with st.sidebar:
+    st.image("https://img.icons8.com/fluency/96/stock-share.png", width=80)
+    st.markdown("### 🎛️ Control Panel")
+    
+    # 수집 설정
+    st.markdown("#### ⚙️ Collection Settings")
+    interval_min = st.slider(
+        "Auto-refresh Interval (min)",
+        min_value=30,
+        max_value=360,
+        value=60,
+        step=30,
+        help="뉴스 수집 주기를 설정합니다"
+    )
+    
+    # 상태 관리
+    if "auto_running" not in st.session_state:
+        st.session_state.auto_running = False
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("▶️ Start", use_container_width=True, type="primary"):
+            st.session_state.auto_running = True
+    with col2:
+        if st.button("⏸️ Pause", use_container_width=True):
+            st.session_state.auto_running = False
+    
+    # 상태 표시
+    st.markdown("---")
+    if st.session_state.auto_running:
+        st.markdown("""
+        <div class="status-badge status-active">
+            🟢 ACTIVE - Collecting Data
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class="status-badge status-inactive">
+            ⚪ PAUSED
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # 커버리지 정보
+    st.markdown("---")
+    st.markdown("#### 🌍 Global Coverage")
+    coverage_data = {
+        "Region": ["미국", "아시아", "유럽", "기타"],
+        "Countries": [1, 6, 3, 2]
+    }
+    fig_coverage = px.pie(
+        coverage_data,
+        values="Countries",
+        names="Region",
+        hole=0.4,
+        color_discrete_sequence=px.colors.sequential.Blues_r
+    )
+    fig_coverage.update_layout(
+        showlegend=True,
+        height=200,
+        margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white', size=10)
+    )
+    st.plotly_chart(fig_coverage, use_container_width=True)
+    
+    # 수집 국가 목록
+    st.markdown("#### 📍 Monitored Countries")
+    countries = "🇺🇸 🇰🇷 🇨🇳 🇯🇵 🇩🇪 🇫🇷 🇬🇧 🇮🇳 🇹🇼 🇸🇬 🇭🇰 🇨🇦"
+    st.info(countries)
+
+# ==========================================
+# 메인 탭
+# ==========================================
+tab1, tab2, tab3 = st.tabs(["📈 Dashboard", "📰 Latest News", "⚙️ Settings"])
 
 # =========================================================
-# TAB 1: 수집 모니터링
+# TAB 1: 대시보드
 # =========================================================
 with tab1:
-    col_ctrl, col_log = st.columns([1, 2])
+    # KPI 메트릭
+    if supabase:
+        try:
+            # 전체 기사 수
+            total_response = supabase.table("news_articles").select("*", count="exact").execute()
+            total_articles = total_response.count if hasattr(total_response, 'count') else len(total_response.data)
+            
+            # 오늘 수집 기사
+            today = datetime.now().date()
+            today_response = supabase.table("news_articles")\
+                .select("*")\
+                .gte("published_at", today.isoformat())\
+                .execute()
+            today_articles = len(today_response.data)
+            
+            # 카테고리 수
+            categories_response = supabase.table("news_articles").select("categories").execute()
+            all_categories = set()
+            for item in categories_response.data:
+                if item.get('categories'):
+                    all_categories.update(item['categories'])
+            category_count = len(all_categories)
+            
+            # 활성 국가
+            countries_response = supabase.table("news_articles").select("country").execute()
+            active_countries = len(set([item['country'] for item in countries_response.data if item.get('country')]))
+            
+        except Exception as e:
+            total_articles = 0
+            today_articles = 0
+            category_count = 0
+            active_countries = 0
+    else:
+        total_articles = 0
+        today_articles = 0
+        category_count = 0
+        active_countries = 0
     
-    with col_ctrl:
-        st.subheader("제어 센터")
-        interval_min = st.slider("자동 수집 주기 (분)", 30, 360, 60, step=30)
-        
-        if "auto_running" not in st.session_state:
-            st.session_state.auto_running = False
-
-        if st.button(label="🚀 자동 수집 시작", type="primary", use_container_width=True):
-            st.session_state.auto_running = True
-        
-        if st.button(label="⏹️ 중지", use_container_width=True):
-            st.session_state.auto_running = False
-            
-        st.divider()
-        if st.session_state.auto_running:
-            st.success(f"가동 중... ({interval_min}분 주기)")
-        else:
-            st.warning("일시 정지됨")
-            
-        st.info("""
-        **수집 대상 국가:**
-        🇺🇸미국 🇰🇷한국 🇨🇳중국 🇯🇵일본 
-        🇩🇪독일 🇫🇷프랑스 🇬🇧영국 🇮🇳인도 🇹🇼대만
-        """)
-
-    with col_log:
-        st.subheader("실시간 현황")
-        status_area = st.empty()
-        
+    # KPI 카드
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{total_articles:,}</div>
+            <div class="metric-label">Total Articles</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">+{today_articles}</div>
+            <div class="metric-label">Today's Collection</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{category_count}</div>
+            <div class="metric-label">Categories</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{active_countries}</div>
+            <div class="metric-label">Active Countries</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 차트 섹션
+    chart_col1, chart_col2 = st.columns(2)
+    
+    with chart_col1:
+        st.markdown("### 📊 Articles by Country")
         if supabase:
             try:
-                response = supabase.table("news_articles")\
-                    .select("*")\
-                    .order("published_at", desc=True)\
-                    .limit(50)\
-                    .execute()
+                response = supabase.table("news_articles").select("country").execute()
                 if response.data:
-                    df = pd.DataFrame(response.data)
-                    st.dataframe(
-                        df[["country", "title", "categories", "published_at"]], 
-                        use_container_width=True, 
-                        hide_index=True
+                    country_counts = pd.DataFrame(response.data)['country'].value_counts()
+                    fig_country = go.Figure(data=[
+                        go.Bar(
+                            x=country_counts.index,
+                            y=country_counts.values,
+                            marker=dict(
+                                color=country_counts.values,
+                                colorscale='Blues',
+                                line=dict(color='#1e3a8a', width=2)
+                            )
+                        )
+                    ])
+                    fig_country.update_layout(
+                        height=300,
+                        paper_bgcolor='rgba(30, 41, 59, 0.5)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='white'),
+                        xaxis=dict(showgrid=False),
+                        yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)'),
+                        margin=dict(l=0, r=0, t=20, b=0)
                     )
+                    st.plotly_chart(fig_country, use_container_width=True)
             except:
-                st.error("DB 연결 오류")
+                st.info("Loading data...")
+    
+    with chart_col2:
+        st.markdown("### 🏷️ Top Categories")
+        if supabase:
+            try:
+                response = supabase.table("news_articles").select("categories").execute()
+                if response.data:
+                    all_cats = []
+                    for item in response.data:
+                        if item.get('categories'):
+                            all_cats.extend(item['categories'])
+                    
+                    cat_counts = pd.Series(all_cats).value_counts().head(8)
+                    
+                    fig_cat = go.Figure(data=[
+                        go.Bar(
+                            x=cat_counts.values,
+                            y=cat_counts.index,
+                            orientation='h',
+                            marker=dict(
+                                color=cat_counts.values,
+                                colorscale='Viridis',
+                                line=dict(color='#1e3a8a', width=2)
+                            )
+                        )
+                    ])
+                    fig_cat.update_layout(
+                        height=300,
+                        paper_bgcolor='rgba(30, 41, 59, 0.5)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='white'),
+                        xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)'),
+                        yaxis=dict(showgrid=False),
+                        margin=dict(l=0, r=0, t=20, b=0)
+                    )
+                    st.plotly_chart(fig_cat, use_container_width=True)
+            except:
+                st.info("Loading data...")
+    
+    # 타임라인 차트
+    st.markdown("### 📅 Collection Timeline (Last 7 Days)")
+    if supabase:
+        try:
+            week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+            response = supabase.table("news_articles")\
+                .select("published_at")\
+                .gte("published_at", week_ago)\
+                .execute()
+            
+            if response.data:
+                df_timeline = pd.DataFrame(response.data)
+                df_timeline['published_at'] = pd.to_datetime(df_timeline['published_at'])
+                df_timeline['date'] = df_timeline['published_at'].dt.date
+                daily_counts = df_timeline.groupby('date').size().reset_index(name='count')
+                
+                fig_timeline = px.area(
+                    daily_counts,
+                    x='date',
+                    y='count',
+                    color_discrete_sequence=['#3b82f6']
+                )
+                fig_timeline.update_layout(
+                    height=250,
+                    paper_bgcolor='rgba(30, 41, 59, 0.5)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='white'),
+                    xaxis=dict(showgrid=False, title=""),
+                    yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)', title="Articles"),
+                    margin=dict(l=0, r=0, t=20, b=0)
+                )
+                st.plotly_chart(fig_timeline, use_container_width=True)
+        except:
+            st.info("Loading timeline data...")
 
+# =========================================================
+# TAB 2: 최신 뉴스
+# =========================================================
+with tab2:
+    col_header, col_refresh = st.columns([3, 1])
+    
+    with col_header:
+        st.markdown("### 📰 Latest Economic News")
+    
+    with col_refresh:
+        if st.button("🔄 Refresh", use_container_width=True):
+            st.rerun()
+    
+    # 필터
+    filter_col1, filter_col2, filter_col3 = st.columns(3)
+    
+    with filter_col1:
+        filter_country = st.selectbox(
+            "Country",
+            ["All"] + ["미국", "한국", "중국", "일본", "독일", "프랑스", "영국", "인도", "대만", "싱가포르", "홍콩", "캐나다"],
+            key="filter_country"
+        )
+    
+    with filter_col2:
+        if supabase:
+            try:
+                cat_response = supabase.table("news_articles").select("categories").execute()
+                all_categories = set()
+                for item in cat_response.data:
+                    if item.get('categories'):
+                        all_categories.update(item['categories'])
+                filter_category = st.selectbox("Category", ["All"] + sorted(list(all_categories)))
+            except:
+                filter_category = "All"
+        else:
+            filter_category = "All"
+    
+    with filter_col3:
+        limit = st.selectbox("Show", [50, 100, 200], index=0)
+    
+    # 뉴스 데이터 로드
+    status_area = st.empty()
+    
+    if supabase:
+        try:
+            query = supabase.table("news_articles")\
+                .select("*")\
+                .order("published_at", desc=True)\
+                .limit(limit)
+            
+            # 필터 적용
+            if filter_country != "All":
+                query = query.eq("country", filter_country)
+            
+            response = query.execute()
+            
+            if response.data:
+                df = pd.DataFrame(response.data)
+                
+                # 카테고리 필터 (클라이언트 사이드)
+                if filter_category != "All":
+                    df = df[df['categories'].apply(lambda x: filter_category in x if x else False)]
+                
+                # 날짜 포맷
+                df['published_at'] = pd.to_datetime(df['published_at']).dt.strftime('%Y-%m-%d %H:%M')
+                
+                # 카테고리 표시 개선
+                df['categories_display'] = df['categories'].apply(
+                    lambda x: ', '.join(x[:3]) if x else 'General'
+                )
+                
+                # 테이블 표시
+                display_cols = ['country', 'title', 'categories_display', 'published_at', 'source']
+                column_config = {
+                    'country': st.column_config.TextColumn('🌍 Country', width='small'),
+                    'title': st.column_config.TextColumn('📰 Title', width='large'),
+                    'categories_display': st.column_config.TextColumn('🏷️ Categories', width='medium'),
+                    'published_at': st.column_config.TextColumn('📅 Published', width='small'),
+                    'source': st.column_config.TextColumn('📌 Source', width='small')
+                }
+                
+                st.dataframe(
+                    df[display_cols],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config=column_config,
+                    height=600
+                )
+                
+                st.caption(f"Showing {len(df)} articles")
+                
+            else:
+                st.info("No articles found. Start collection to populate the database.")
+                
+        except Exception as e:
+            st.error(f"Database Error: {str(e)}")
+    else:
+        st.warning("⚠️ Database connection not configured. Please check Supabase settings.")
+    
+    # 자동 수집 실행
     if st.session_state.auto_running:
-        status_area.info("🌍 전 세계 뉴스 스캔 시작...")
+        status_area.info("🌍 Scanning global news sources...")
         try:
             total_saved, logs = run_global_batch()
             if total_saved > 0:
-                status_area.success(f"🎉 총 {total_saved}개 저장 완료!\n" + "\n".join(logs))
+                status_area.success(f"🎉 Collected {total_saved} new articles!\n\n" + "\n".join(logs))
             else:
-                status_area.info("새로운 기사 없음.")
+                status_area.info("✅ Scan complete. No new articles.")
         except Exception as e:
-            status_area.error(f"에러: {e}")
+            status_area.error(f"❌ Collection Error: {str(e)}")
         
         time.sleep(interval_min * 60)
         st.rerun()
 
 # =========================================================
-# TAB 2: 키워드 관리 (심플 버전)
+# TAB 3: 설정 (키워드 관리)
 # =========================================================
-with tab2:
-    st.header("키워드 설정")
-    st.caption("언어 상관없이 키워드만 입력하세요. (예: Samsung, 삼성전자, 华为)")
+with tab3:
+    st.markdown("### ⚙️ Keyword Management")
+    st.caption("Configure custom keywords for categorization and filtering")
     
-    # [수정] 언어 선택란 삭제 -> 아주 심플해짐
-    with st.form("add_keyword_form", clear_on_submit=True):
-        c1, c2, c3 = st.columns([2, 3, 1])
-        with c1:
-            new_cat = st.text_input("카테고리", placeholder="예: 반도체")
-        with c2:
-            new_word = st.text_input("검색 키워드", placeholder="예: TSMC")
-        with c3:
-            st.write("") 
-            st.write("") 
-            submitted = st.form_submit_button("추가", type="primary")
+    # 키워드 추가 폼
+    with st.expander("➕ Add New Keyword", expanded=True):
+        with st.form("add_keyword_form", clear_on_submit=True):
+            col1, col2, col3 = st.columns([2, 3, 1])
             
-        if submitted:
-            if new_cat and new_word:
-                add_keyword(new_cat, new_word)
-                st.success(f"✅ '{new_word}' 추가됨!")
-                st.rerun()
-            else:
-                st.error("입력값을 확인하세요.")
-
-    st.divider()
-
+            with col1:
+                new_cat = st.text_input(
+                    "Category",
+                    placeholder="e.g., Semiconductor",
+                    help="분류할 카테고리 이름"
+                )
+            
+            with col2:
+                new_word = st.text_input(
+                    "Keyword",
+                    placeholder="e.g., TSMC, 삼성전자, 华为",
+                    help="검색할 키워드 (다국어 지원)"
+                )
+            
+            with col3:
+                st.write("")
+                st.write("")
+                submitted = st.form_submit_button("Add", type="primary", use_container_width=True)
+            
+            if submitted:
+                if new_cat and new_word:
+                    add_keyword(new_cat, new_word)
+                    st.success(f"✅ Keyword '{new_word}' added to category '{new_cat}'")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("⚠️ Please fill in all fields")
+    
+    st.markdown("---")
+    
+    # 등록된 키워드 표시
     keywords = get_all_keywords()
+    
     if keywords:
         df_k = pd.DataFrame(keywords)
-        st.subheader(f"등록된 키워드 ({len(keywords)}개)")
+        st.markdown(f"### 📋 Registered Keywords ({len(keywords)} total)")
         
-        for cat in df_k['category'].unique():
-            with st.expander(f"📂 {cat}", expanded=True):
+        # 카테고리별 그룹화
+        for cat in sorted(df_k['category'].unique()):
+            with st.expander(f"📂 {cat}", expanded=False):
                 cat_data = df_k[df_k['category'] == cat]
-                for _, row in cat_data.iterrows():
-                    col_txt, col_del = st.columns([4, 1])
-                    with col_txt:
-                        st.write(f"- {row['keyword']}")
-                    with col_del:
-                        if st.button("삭제", key=f"del_{row['id']}"):
-                            delete_keyword(row['id'])
-                            st.rerun()
+                
+                # 그리드 레이아웃
+                cols = st.columns(4)
+                for idx, (_, row) in enumerate(cat_data.iterrows()):
+                    with cols[idx % 4]:
+                        col_text, col_btn = st.columns([3, 1])
+                        with col_text:
+                            st.markdown(f"**{row['keyword']}**")
+                        with col_btn:
+                            if st.button("🗑️", key=f"del_{row['id']}", help="Delete keyword"):
+                                delete_keyword(row['id'])
+                                st.rerun()
     else:
-        st.info("등록된 키워드가 없습니다.")
+        st.info("📭 No keywords registered yet. Add your first keyword above!")
+    
+    st.markdown("---")
+    
+    # 시스템 정보
+    st.markdown("### 🔧 System Information")
+    
+    info_col1, info_col2 = st.columns(2)
+    
+    with info_col1:
+        st.markdown("""
+        **Collection Status**
+        - Auto-refresh: {}
+        - Interval: {} minutes
+        - Monitored Countries: 12
+        - Economic Keywords: 100+
+        """.format(
+            "🟢 Active" if st.session_state.auto_running else "⚪ Paused",
+            interval_min
+        ))
+    
+    with info_col2:
+        st.markdown("""
+        **Database**
+        - Provider: Supabase
+        - Status: {}
+        - Tables: news_articles, search_keywords
+        """.format("🟢 Connected" if supabase else "🔴 Disconnected"))
+
+# ==========================================
+# Footer
+# ==========================================
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; color: #64748b; padding: 2rem;'>
+    <p>Global Economic Intelligence Hub v2.0 | Powered by AI & Real-time Data</p>
+    <p style='font-size: 0.875rem;'>🌍 Monitoring 12 countries • 📊 100+ economic indicators • 🔄 Real-time updates</p>
+</div>
+""", unsafe_allow_html=True)
