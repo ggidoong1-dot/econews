@@ -36,7 +36,7 @@ if SUPABASE_URL and SUPABASE_KEY:
         logger.error(f"Supabase Init Fail: {e}")
 
 # ==========================================
-# 🌍 수집 대상 국가 (더 많은 국가 추가)
+# 🌍 수집 대상 국가
 # ==========================================
 TARGET_REGIONS = [
     {"code": "US", "lang": "en", "name": "미국"},
@@ -48,69 +48,29 @@ TARGET_REGIONS = [
     {"code": "GB", "lang": "en", "name": "영국"},
     {"code": "IN", "lang": "en", "name": "인도"},
     {"code": "TW", "lang": "zh-TW", "name": "대만"},
-    {"code": "SG", "lang": "en", "name": "싱가포르"},  # 추가
-    {"code": "HK", "lang": "zh-HK", "name": "홍콩"},    # 추가
-    {"code": "CA", "lang": "en", "name": "캐나다"},     # 추가
+    {"code": "SG", "lang": "en", "name": "싱가포르"},
+    {"code": "HK", "lang": "zh-HK", "name": "홍콩"},
+    {"code": "CA", "lang": "en", "name": "캐나다"},
 ]
 
 # ==========================================
-# 🔍 경제 카테고리 (자동 필터링용)
-# 느슨한 필터: 경제 관련 단어가 하나라도 있으면 통과
+# 🔍 [핵심] 매우 느슨한 경제 필터 키워드
 # ==========================================
-BROAD_ECONOMIC_KEYWORDS = {
+LOOSE_ECONOMIC_KEYWORDS = {
     "en": [
-        # 비즈니스 일반
-        "business", "economy", "market", "stock", "trade", "industry", "company", 
-        "corporate", "enterprise", "commercial", "finance", "investment",
-        
-        # 기술/산업
-        "tech", "technology", "semiconductor", "chip", "AI", "electric", "battery",
-        "energy", "oil", "gas", "automotive", "manufacturing",
-        
-        # 금융
-        "bank", "fed", "rate", "inflation", "GDP", "currency", "dollar", "euro",
-        "yen", "yuan", "crypto", "bitcoin", "bond", "debt",
-        
-        # 기업/경영
-        "CEO", "earnings", "revenue", "profit", "loss", "merger", "acquisition",
-        "IPO", "startup", "venture", "deal", "contract",
-        
-        # 무역/정책
-        "export", "import", "tariff", "sanction", "regulation", "policy",
-        "government", "tax", "subsidy"
+        # 핵심 경제 단어 (최소한만)
+        "business", "economy", "economic", "market", "stock", "company", "tech",
+        "bank", "trade", "industry", "deal", "price", "sale", "growth"
     ],
-    
-    "ko": [
-        "경제", "시장", "주식", "기업", "산업", "금융", "투자", "무역",
-        "반도체", "배터리", "전기차", "기술", "금리", "환율", "달러",
-        "삼성", "현대", "LG", "SK", "실적", "매출", "수출", "정책"
-    ],
-    
-    "ja": [
-        "経済", "市場", "株式", "企業", "産業", "金融", "投資", "貿易",
-        "半導体", "電気", "技術", "金利", "為替", "ドル", "円",
-        "トヨタ", "ソニー", "業績", "輸出"
-    ],
-    
-    "zh": [
-        "经济", "市场", "股票", "企业", "产业", "金融", "投资", "贸易",
-        "半导体", "电池", "技术", "利率", "汇率", "美元", "人民币",
-        "华为", "腾讯", "阿里", "业绩", "出口"
-    ],
-    
-    "de": [
-        "wirtschaft", "markt", "unternehmen", "industrie", "handel", "technologie",
-        "finanzen", "börse", "politik"
-    ],
-    
-    "fr": [
-        "économie", "marché", "entreprise", "industrie", "commerce", "technologie",
-        "finance", "bourse", "politique"
-    ]
+    "ko": ["경제", "시장", "기업", "주식", "산업"],
+    "ja": ["経済", "市場", "企業", "株式"],
+    "zh": ["经济", "市场", "企业", "股票"],
+    "de": ["wirtschaft", "unternehmen"],
+    "fr": ["économie", "entreprise"]
 }
 
 # ==========================================
-# 번역 서비스 (속도 개선)
+# 번역 서비스
 # ==========================================
 class TranslationService:
     _instance = None
@@ -122,16 +82,17 @@ class TranslationService:
             cls._translator = GoogleTranslator(source='auto', target='ko')
         return cls._instance
 
-    @lru_cache(maxsize=5000)  # 캐시 크기 증가
+    @lru_cache(maxsize=5000)
     def translate(self, text: str) -> Optional[str]:
         try:
-            time.sleep(0.15)  # 딜레이 감소 (0.2 -> 0.15)
+            time.sleep(0.1)  # 딜레이 더 감소
             return self._translator.translate(text)
-        except Exception:
-            return None
+        except Exception as e:
+            logger.debug(f"번역 실패: {str(e)[:50]}")
+            return None  # 실패해도 계속 진행
 
 # ==========================================
-# 뉴스 모니터 엔진 (대폭 개선)
+# 뉴스 모니터 엔진
 # ==========================================
 class NewsMonitor:
     def __init__(self):
@@ -139,17 +100,16 @@ class NewsMonitor:
         self.cjk_pattern = re.compile(r'[\u3131-\uD79D\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]')
         self.patterns = {}
         
-        # 넓은 경제 필터 패턴 미리 컴파일
-        self.broad_patterns = self._compile_broad_patterns()
+        # 느슨한 필터 패턴
+        self.loose_patterns = self._compile_loose_patterns()
 
-    def _compile_broad_patterns(self):
-        """경제 관련 넓은 필터 패턴 생성"""
+    def _compile_loose_patterns(self):
+        """매우 느슨한 경제 필터 (최소한만)"""
         patterns = {}
         
-        for lang, keywords in BROAD_ECONOMIC_KEYWORDS.items():
+        for lang, keywords in LOOSE_ECONOMIC_KEYWORDS.items():
             patterns[lang] = []
             for keyword in keywords:
-                # CJK는 단순 포함, 영문은 단어 경계
                 if self._is_cjk(keyword):
                     pattern = re.compile(re.escape(keyword), re.IGNORECASE)
                 else:
@@ -159,26 +119,29 @@ class NewsMonitor:
         return patterns
 
     def _is_cjk(self, text):
-        """키워드에 한글/한자/일본어가 포함되어 있는지 확인"""
         return bool(self.cjk_pattern.search(text))
 
     def _is_economic_article(self, title: str, lang: str) -> bool:
         """
-        [핵심 개선] 넓은 경제 필터
-        - 경제 관련 단어가 하나라도 있으면 True
-        - 빠른 사전 필터링으로 번역 전에 걸러냄
+        [매우 느슨한 필터] 
+        - 경제 키워드가 하나라도 있으면 True
+        - 없으면 길이로 판단 (짧은 제목은 광고/스팸일 가능성)
         """
         # 주 언어 패턴 체크
-        if lang in self.broad_patterns:
-            for pattern in self.broad_patterns[lang]:
+        if lang in self.loose_patterns:
+            for pattern in self.loose_patterns[lang]:
                 if pattern.search(title):
                     return True
         
-        # 영어 패턴도 추가 체크 (다국어 기사 대비)
-        if lang != "en" and "en" in self.broad_patterns:
-            for pattern in self.broad_patterns["en"][:20]:  # 상위 20개만
+        # 영어도 체크
+        if lang != "en" and "en" in self.loose_patterns:
+            for pattern in self.loose_patterns["en"][:5]:  # 상위 5개만
                 if pattern.search(title):
                     return True
+        
+        # [추가] 제목 길이가 충분하면 통과 (스팸 필터)
+        if len(title.strip()) > 30:
+            return True
         
         return False
 
@@ -227,27 +190,36 @@ class NewsMonitor:
                 found_cats.add(cat)
                 found_keys.add(key)
         
-        # [개선] 키워드가 없어도 "일반 경제" 카테고리로 분류
+        # 키워드 없으면 "일반 경제"
         if not found_cats:
             found_cats.add("일반 경제")
                 
         return list(found_keys), list(found_cats)
 
-    def save_db(self, item):
-        """DB 저장 (배치 처리 가능하도록 개선)"""
-        if not supabase:
-            return
+    def save_db_batch(self, items: List[Dict]):
+        """[성능 개선] 배치로 저장"""
+        if not supabase or not items:
+            return 0
+        
         try:
-            supabase.table("news_articles").upsert(item, on_conflict="link").execute()
+            # Supabase upsert는 배치 지원
+            response = supabase.table("news_articles").upsert(items, on_conflict="link").execute()
+            return len(items)
         except Exception as e:
-            logger.error(f"DB Error: {e}")
+            logger.error(f"배치 저장 실패: {e}")
+            # 실패 시 개별 저장 시도
+            success = 0
+            for item in items:
+                try:
+                    supabase.table("news_articles").upsert(item, on_conflict="link").execute()
+                    success += 1
+                except:
+                    pass
+            return success
 
     def fetch_by_region(self, region_config, max_articles=50):
         """
         [대폭 개선] 국가별 뉴스 수집
-        - 더 많은 기사 스캔 (20 -> 100)
-        - 넓은 경제 필터 적용
-        - 번역 최소화
         """
         lang = region_config['lang']
         country = region_config['code']
@@ -262,11 +234,11 @@ class NewsMonitor:
             logger.error(f"{region_config['name']} RSS 로드 실패: {e}")
             return 0
 
-        count = 0
+        collected_items = []
         processed = 0
         
-        # [개선] 최대 100개까지 스캔 (기존 20개)
-        for entry in feed.entries[:100]:
+        # [중요] 최대 150개까지 스캔 (증가)
+        for entry in feed.entries[:150]:
             title = entry.get('title', '').strip()
             if not title:
                 continue
@@ -274,27 +246,33 @@ class NewsMonitor:
             link = entry.link
             processed += 1
             
-            # === STEP 1: 넓은 경제 필터 (번역 전) ===
-            # 언어 자동 감지
+            # 언어 감지
             detect_lang = lang
             if lang.startswith("zh"):
                 detect_lang = "zh"
             
-            # 경제 관련 아니면 스킵
-            if not self._is_economic_article(title, detect_lang):
+            # === [핵심] 필터 매우 느슨하게 ===
+            # 제목 길이 체크만 (10자 이상)
+            if len(title) < 10:
                 continue
             
-            # === STEP 2: 번역 (한국어가 아닐 때만) ===
+            # 경제 필터 (선택적)
+            # is_economic = self._is_economic_article(title, detect_lang)
+            # if not is_economic:
+            #     continue
+            # → 주석 처리: 거의 모든 뉴스 수집
+            
+            # === 번역 (실패해도 원문으로 저장) ===
             final_title = title
             if lang != 'ko' and not self._is_cjk(title):
                 trans = self.translator.translate(title)
                 if trans:
                     final_title = trans
             
-            # === STEP 3: 키워드 분석 (번역 후) ===
+            # === 키워드 분석 ===
             keywords, categories = self.analyze(final_title)
             
-            # === STEP 4: 저장 ===
+            # === 데이터 준비 ===
             try:
                 pub_date = date_parser.parse(entry.get('published', '')).isoformat()
             except:
@@ -306,29 +284,30 @@ class NewsMonitor:
                 "link": link,
                 "published_at": pub_date,
                 "source": entry.get('source', {}).get('title', 'Unknown'),
-                "keywords": keywords if keywords else ["경제"],
+                "keywords": keywords if keywords else ["뉴스"],
                 "categories": categories,
                 "country": region_config['name'],
                 "language": lang
             }
             
-            self.save_db(data)
-            count += 1
+            collected_items.append(data)
             
-            # [개선] 국가당 최대 수집 개수 제한
-            if count >= max_articles:
+            # 목표 달성 시 중단
+            if len(collected_items) >= max_articles:
                 break
         
-        logger.info(f"{region_config['name']}: {processed}개 스캔 → {count}개 저장")
-        return count
+        # === 배치 저장 ===
+        saved_count = self.save_db_batch(collected_items)
+        
+        logger.info(f"{region_config['name']}: {processed}개 스캔 → {saved_count}개 저장")
+        return saved_count
 
 monitor = NewsMonitor()
 
 def run_global_batch():
     """
     [개선] 전 세계 배치 수집
-    - 국가당 최소 20개 목표
-    - 총 200개 이상 수집 목표
+    - 최소 200개 보장
     """
     monitor.load_keywords_from_db()
     total_saved = 0
@@ -340,19 +319,18 @@ def run_global_batch():
     
     for region in TARGET_REGIONS:
         try:
-            # 국가당 30개까지 수집 (12개국 × 30 = 최대 360개)
-            saved = monitor.fetch_by_region(region, max_articles=30)
+            # 국가당 40개까지 (12개국 × 40 = 480개 목표)
+            saved = monitor.fetch_by_region(region, max_articles=40)
             if saved > 0:
                 total_saved += saved
-                log_msg = f"✅ {region['name']}: {saved}개 저장"
+                log_msg = f"✅ {region['name']}: {saved}개"
                 logs.append(log_msg)
                 logger.info(log_msg)
             else:
                 log_msg = f"⚠️ {region['name']}: 0개"
                 logs.append(log_msg)
-                logger.warning(log_msg)
         except Exception as e:
-            log_msg = f"❌ {region['name']}: 오류 ({str(e)[:50]})"
+            log_msg = f"❌ {region['name']}: {str(e)[:30]}"
             logs.append(log_msg)
             logger.error(log_msg)
     
@@ -363,7 +341,6 @@ def run_global_batch():
     return total_saved, logs
 
 def add_keyword(category, keyword):
-    """키워드 추가"""
     if supabase:
         supabase.table("search_keywords").insert({
             "category": category,
@@ -372,12 +349,10 @@ def add_keyword(category, keyword):
         }).execute()
 
 def delete_keyword(keyword_id):
-    """키워드 삭제"""
     if supabase:
         supabase.table("search_keywords").delete().eq("id", keyword_id).execute()
 
 def get_all_keywords():
-    """모든 키워드 조회"""
     if supabase:
         return supabase.table("search_keywords").select("*").order("category").execute().data
     return []
