@@ -1,6 +1,7 @@
 streamlit
+pandas
 feedparser
 deep-translator
-pandas
 python-dateutil
 supabase
+plotly
