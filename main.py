@@ -17,6 +17,17 @@ st.set_page_config(
 )
 
 # ==========================================
+# [핵심 수정] 자동 새로고침 설정
+# ==========================================
+# 세션 상태 초기화
+if "last_run" not in st.session_state:
+    st.session_state.last_run = None
+if "auto_running" not in st.session_state:
+    st.session_state.auto_running = False
+if "collection_count" not in st.session_state:
+    st.session_state.collection_count = 0
+
+# ==========================================
 # 커스텀 CSS (고대비 전문 디자인)
 # ==========================================
 st.markdown("""
@@ -213,16 +224,26 @@ with st.sidebar:
     )
     
     # 상태 관리
-    if "auto_running" not in st.session_state:
-        st.session_state.auto_running = False
-    
     col1, col2 = st.columns(2)
     with col1:
         if st.button("▶️ Start", use_container_width=True, type="primary"):
             st.session_state.auto_running = True
+            st.session_state.last_run = datetime.now()
+            st.rerun()
     with col2:
         if st.button("⏸️ Pause", use_container_width=True):
             st.session_state.auto_running = False
+            st.rerun()
+    
+    # [추가] 즉시 수집 버튼
+    if st.button("🚀 Collect Now", use_container_width=True):
+        with st.spinner("수집 중..."):
+            total, logs = run_global_batch()
+            st.session_state.collection_count += 1
+            st.session_state.last_run = datetime.now()
+            st.success(f"✅ {total}개 수집 완료!")
+            time.sleep(2)
+            st.rerun()
     
     # 상태 표시
     st.markdown("---")
@@ -232,12 +253,26 @@ with st.sidebar:
             🟢 ACTIVE - Collecting Data
         </div>
         """, unsafe_allow_html=True)
+        
+        # 다음 수집 시간
+        if st.session_state.last_run:
+            next_run = st.session_state.last_run + timedelta(minutes=interval_min)
+            time_left = (next_run - datetime.now()).total_seconds() / 60
+            if time_left > 0:
+                st.info(f"⏱️ Next collection in {int(time_left)} minutes")
     else:
         st.markdown("""
         <div class="status-badge status-inactive">
             ⚪ PAUSED
         </div>
         """, unsafe_allow_html=True)
+    
+    # 수집 통계
+    if st.session_state.last_run:
+        st.markdown("---")
+        st.markdown("#### 📊 Collection Stats")
+        st.metric("Total Runs", st.session_state.collection_count)
+        st.caption(f"Last run: {st.session_state.last_run.strftime('%Y-%m-%d %H:%M')}")
     
     # 커버리지 정보
     st.markdown("---")
@@ -274,6 +309,27 @@ with st.sidebar:
     st.markdown("#### 📍 Monitored Countries")
     countries = "🇺🇸 🇰🇷 🇨🇳 🇯🇵 🇩🇪 🇫🇷 🇬🇧 🇮🇳 🇹🇼 🇸🇬 🇭🇰 🇨🇦"
     st.info(countries)
+
+# ==========================================
+# [핵심] 자동 수집 로직 (타이머 기반)
+# ==========================================
+if st.session_state.auto_running and st.session_state.last_run:
+    time_since_last = (datetime.now() - st.session_state.last_run).total_seconds() / 60
+    
+    # 설정된 간격이 지나면 자동 수집
+    if time_since_last >= interval_min:
+        with st.spinner("🌍 Automatic collection in progress..."):
+            total, logs = run_global_batch()
+            st.session_state.collection_count += 1
+            st.session_state.last_run = datetime.now()
+            st.success(f"🎉 Auto-collected {total} articles!")
+            time.sleep(3)
+            st.rerun()
+
+# 자동 페이지 새로고침 (30초마다 체크)
+if st.session_state.auto_running:
+    time.sleep(30)
+    st.rerun()
 
 # ==========================================
 # 메인 탭
@@ -597,8 +653,6 @@ with tab2:
         limit = st.selectbox("Show", [50, 100, 200], index=0)
     
     # 뉴스 데이터 로드
-    status_area = st.empty()
-    
     if supabase:
         try:
             query = supabase.table("news_articles")\
@@ -654,21 +708,6 @@ with tab2:
             st.error(f"Database Error: {str(e)}")
     else:
         st.warning("⚠️ Database connection not configured. Please check Supabase settings.")
-    
-    # 자동 수집 실행
-    if st.session_state.auto_running:
-        status_area.info("🌍 Scanning global news sources...")
-        try:
-            total_saved, logs = run_global_batch()
-            if total_saved > 0:
-                status_area.success(f"🎉 Collected {total_saved} new articles!\n\n" + "\n".join(logs))
-            else:
-                status_area.info("✅ Scan complete. No new articles.")
-        except Exception as e:
-            status_area.error(f"❌ Collection Error: {str(e)}")
-        
-        time.sleep(interval_min * 60)
-        st.rerun()
 
 # =========================================================
 # TAB 3: 설정 (키워드 관리)
@@ -751,10 +790,11 @@ with tab3:
         - Auto-refresh: {}
         - Interval: {} minutes
         - Monitored Countries: 12
-        - Economic Keywords: 100+
+        - Collection Runs: {}
         """.format(
             "🟢 Active" if st.session_state.auto_running else "⚪ Paused",
-            interval_min
+            interval_min,
+            st.session_state.collection_count
         ))
     
     with info_col2:
@@ -771,7 +811,7 @@ with tab3:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #64748b; padding: 2rem;'>
-    <p>Global Economic Intelligence Hub v2.0 | Powered by AI & Real-time Data</p>
-    <p style='font-size: 0.875rem;'>🌍 Monitoring 12 countries • 📊 100+ economic indicators • 🔄 Real-time updates</p>
+    <p>Global Economic Intelligence Hub v2.1 | Powered by AI & Real-time Data</p>
+    <p style='font-size: 0.875rem;'>🌍 Monitoring 12 countries • 📊 Real-time collection • 🔄 Auto-refresh every {} min</p>
 </div>
-""", unsafe_allow_html=True)
+""".format(interval_min if st.session_state.auto_running else "N/A"), unsafe_allow_html=True)
