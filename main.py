@@ -17,112 +17,141 @@ st.set_page_config(
 )
 
 # ==========================================
-# 커스텀 CSS (경제 전문 사이트 스타일)
+# 커스텀 CSS (고대비 전문 디자인)
 # ==========================================
 st.markdown("""
 <style>
-    /* 메인 배경 */
+    /* 메인 배경 - 어두운 배경으로 대비 강화 */
     .main {
-        background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
+        background: #0a0e27;
+        color: #e0e7ff;
+    }
+    
+    /* 모든 텍스트 기본 색상 */
+    .stMarkdown, .stText, p, span, div {
+        color: #e0e7ff !important;
     }
     
     /* 헤더 스타일 */
     .header-container {
-        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #06b6d4 100%);
         padding: 2rem;
-        border-radius: 10px;
+        border-radius: 15px;
         margin-bottom: 2rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+        border: 1px solid rgba(59, 130, 246, 0.2);
     }
     
     .main-title {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: white;
+        font-size: 2.8rem;
+        font-weight: 800;
+        color: #ffffff !important;
         margin: 0;
         text-align: center;
-        letter-spacing: -0.5px;
+        letter-spacing: -1px;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     }
     
     .subtitle {
-        font-size: 1rem;
-        color: #93c5fd;
+        font-size: 1.1rem;
+        color: #dbeafe !important;
         text-align: center;
         margin-top: 0.5rem;
+        font-weight: 500;
     }
     
-    /* 메트릭 카드 */
+    /* 메트릭 카드 - 밝은 텍스트 */
     .metric-card {
         background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        border-left: 4px solid #3b82f6;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        padding: 1.8rem;
+        border-radius: 12px;
+        border-left: 5px solid #60a5fa;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
         margin-bottom: 1rem;
+        border: 1px solid rgba(96, 165, 250, 0.2);
     }
     
     .metric-value {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #3b82f6;
+        font-size: 3rem;
+        font-weight: 800;
+        color: #60a5fa !important;
         margin: 0;
+        text-shadow: 0 0 20px rgba(96, 165, 250, 0.5);
     }
     
     .metric-label {
-        font-size: 0.875rem;
-        color: #94a3b8;
+        font-size: 0.95rem;
+        color: #cbd5e1 !important;
         text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-top: 0.5rem;
+        letter-spacing: 1.5px;
+        margin-top: 0.8rem;
+        font-weight: 600;
+    }
+    
+    /* 섹션 타이틀 */
+    h1, h2, h3, h4 {
+        color: #f1f5f9 !important;
+        font-weight: 700 !important;
     }
     
     /* 상태 배지 */
     .status-badge {
         display: inline-block;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        font-weight: 600;
-        font-size: 0.875rem;
+        padding: 0.6rem 1.2rem;
+        border-radius: 25px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        letter-spacing: 0.5px;
     }
     
     .status-active {
-        background: #10b981;
-        color: white;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white !important;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
     }
     
     .status-inactive {
-        background: #6b7280;
-        color: white;
+        background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+        color: white !important;
     }
     
     /* 데이터 테이블 */
     .dataframe {
-        font-size: 0.9rem !important;
+        font-size: 0.95rem !important;
+        color: #e0e7ff !important;
     }
     
     /* 버튼 커스텀 */
     .stButton>button {
-        border-radius: 8px;
-        font-weight: 600;
+        border-radius: 10px;
+        font-weight: 700;
         transition: all 0.3s;
+        border: 1px solid rgba(59, 130, 246, 0.3);
     }
     
     .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
     }
     
     /* 탭 스타일 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 2rem;
+        gap: 1.5rem;
         background-color: transparent;
     }
     
     .stTabs [data-baseweb="tab"] {
         background-color: #1e293b;
-        border-radius: 8px 8px 0 0;
+        border-radius: 10px 10px 0 0;
         padding: 1rem 2rem;
-        font-weight: 600;
+        font-weight: 700;
+        color: #94a3b8 !important;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white !important;
     }
     
     /* 사이드바 */
@@ -130,8 +159,27 @@ st.markdown("""
         background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
     }
     
-    section[data-testid="stSidebar"] .element-container {
-        color: white;
+    section[data-testid="stSidebar"] * {
+        color: #e0e7ff !important;
+    }
+    
+    /* 입력 필드 */
+    .stTextInput input, .stSelectbox select {
+        background-color: #1e293b !important;
+        color: #e0e7ff !important;
+        border: 1px solid rgba(96, 165, 250, 0.3) !important;
+    }
+    
+    /* 슬라이더 */
+    .stSlider {
+        color: #e0e7ff !important;
+    }
+    
+    /* Info, Warning, Success 박스 */
+    .stAlert {
+        background-color: rgba(30, 41, 59, 0.8) !important;
+        color: #e0e7ff !important;
+        border: 1px solid rgba(96, 165, 250, 0.3);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -203,7 +251,7 @@ with st.sidebar:
         values="Countries",
         names="Region",
         hole=0.4,
-        color_discrete_sequence=px.colors.sequential.Blues_r
+        color_discrete_sequence=['#3b82f6', '#06b6d4', '#8b5cf6', '#10b981']
     )
     fig_coverage.update_layout(
         showlegend=True,
@@ -211,7 +259,14 @@ with st.sidebar:
         margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white', size=10)
+        font=dict(color='#e0e7ff', size=10),
+        legend=dict(
+            font=dict(color='#e0e7ff')
+        )
+    )
+    fig_coverage.update_traces(
+        textfont=dict(color='white', size=10),
+        marker=dict(line=dict(color='#0a0e27', width=2))
     )
     st.plotly_chart(fig_coverage, use_container_width=True)
     
@@ -314,25 +369,52 @@ with tab1:
                 response = supabase.table("news_articles").select("country").execute()
                 if response.data:
                     country_counts = pd.DataFrame(response.data)['country'].value_counts()
-                    fig_country = go.Figure(data=[
-                        go.Bar(
-                            x=country_counts.index,
-                            y=country_counts.values,
-                            marker=dict(
-                                color=country_counts.values,
-                                colorscale='Blues',
-                                line=dict(color='#1e3a8a', width=2)
+                    
+                    # 전문적인 수평 바 차트
+                    fig_country = go.Figure()
+                    
+                    fig_country.add_trace(go.Bar(
+                        y=country_counts.index,
+                        x=country_counts.values,
+                        orientation='h',
+                        marker=dict(
+                            color=country_counts.values,
+                            colorscale='Blues',
+                            line=dict(color='#3b82f6', width=2),
+                            colorbar=dict(
+                                title="Articles",
+                                titlefont=dict(color='#e0e7ff'),
+                                tickfont=dict(color='#e0e7ff')
                             )
-                        )
-                    ])
+                        ),
+                        text=country_counts.values,
+                        textposition='outside',
+                        textfont=dict(size=12, color='#e0e7ff', weight='bold'),
+                        hovertemplate='<b>%{y}</b><br>Articles: %{x}<extra></extra>'
+                    ))
+                    
                     fig_country.update_layout(
-                        height=300,
-                        paper_bgcolor='rgba(30, 41, 59, 0.5)',
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        font=dict(color='white'),
-                        xaxis=dict(showgrid=False),
-                        yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)'),
-                        margin=dict(l=0, r=0, t=20, b=0)
+                        height=350,
+                        paper_bgcolor='rgba(15, 23, 42, 0.8)',
+                        plot_bgcolor='rgba(30, 41, 59, 0.5)',
+                        font=dict(color='#e0e7ff', size=12, family='Arial'),
+                        xaxis=dict(
+                            showgrid=True,
+                            gridcolor='rgba(96, 165, 250, 0.15)',
+                            title="Number of Articles",
+                            titlefont=dict(color='#cbd5e1', size=13),
+                            tickfont=dict(color='#e0e7ff')
+                        ),
+                        yaxis=dict(
+                            showgrid=False,
+                            tickfont=dict(color='#e0e7ff', size=11)
+                        ),
+                        margin=dict(l=10, r=40, t=30, b=40),
+                        hoverlabel=dict(
+                            bgcolor='#1e293b',
+                            font_size=12,
+                            font_color='#e0e7ff'
+                        )
                     )
                     st.plotly_chart(fig_country, use_container_width=True)
             except:
@@ -351,26 +433,49 @@ with tab1:
                     
                     cat_counts = pd.Series(all_cats).value_counts().head(8)
                     
-                    fig_cat = go.Figure(data=[
-                        go.Bar(
-                            x=cat_counts.values,
-                            y=cat_counts.index,
-                            orientation='h',
-                            marker=dict(
-                                color=cat_counts.values,
-                                colorscale='Viridis',
-                                line=dict(color='#1e3a8a', width=2)
-                            )
-                        )
-                    ])
+                    # 전문적인 도넛 차트
+                    fig_cat = go.Figure()
+                    
+                    fig_cat.add_trace(go.Pie(
+                        labels=cat_counts.index,
+                        values=cat_counts.values,
+                        hole=0.5,
+                        marker=dict(
+                            colors=px.colors.sequential.Blues_r,
+                            line=dict(color='#0a0e27', width=2)
+                        ),
+                        textinfo='label+percent',
+                        textfont=dict(size=11, color='white', weight='bold'),
+                        hovertemplate='<b>%{label}</b><br>Articles: %{value}<br>Share: %{percent}<extra></extra>'
+                    ))
+                    
+                    fig_cat.add_annotation(
+                        text=f"<b>{len(all_cats)}</b><br>Total",
+                        x=0.5, y=0.5,
+                        font=dict(size=18, color='#60a5fa', weight='bold'),
+                        showarrow=False
+                    )
+                    
                     fig_cat.update_layout(
-                        height=300,
-                        paper_bgcolor='rgba(30, 41, 59, 0.5)',
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        font=dict(color='white'),
-                        xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)'),
-                        yaxis=dict(showgrid=False),
-                        margin=dict(l=0, r=0, t=20, b=0)
+                        height=350,
+                        paper_bgcolor='rgba(15, 23, 42, 0.8)',
+                        font=dict(color='#e0e7ff', size=11),
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        showlegend=True,
+                        legend=dict(
+                            orientation="v",
+                            yanchor="middle",
+                            y=0.5,
+                            xanchor="left",
+                            x=1.05,
+                            font=dict(color='#e0e7ff', size=10),
+                            bgcolor='rgba(30, 41, 59, 0.5)'
+                        ),
+                        hoverlabel=dict(
+                            bgcolor='#1e293b',
+                            font_size=12,
+                            font_color='#e0e7ff'
+                        )
                     )
                     st.plotly_chart(fig_cat, use_container_width=True)
             except:
@@ -392,20 +497,60 @@ with tab1:
                 df_timeline['date'] = df_timeline['published_at'].dt.date
                 daily_counts = df_timeline.groupby('date').size().reset_index(name='count')
                 
-                fig_timeline = px.area(
-                    daily_counts,
-                    x='date',
-                    y='count',
-                    color_discrete_sequence=['#3b82f6']
-                )
+                # 전문적인 Area + Line 차트
+                fig_timeline = go.Figure()
+                
+                # Area 차트 (배경)
+                fig_timeline.add_trace(go.Scatter(
+                    x=daily_counts['date'],
+                    y=daily_counts['count'],
+                    fill='tozeroy',
+                    fillcolor='rgba(59, 130, 246, 0.3)',
+                    line=dict(color='#3b82f6', width=3),
+                    mode='lines',
+                    name='Articles',
+                    hovertemplate='<b>%{x}</b><br>Articles: %{y}<extra></extra>'
+                ))
+                
+                # 포인트 마커
+                fig_timeline.add_trace(go.Scatter(
+                    x=daily_counts['date'],
+                    y=daily_counts['count'],
+                    mode='markers',
+                    marker=dict(
+                        size=10,
+                        color='#60a5fa',
+                        line=dict(color='white', width=2)
+                    ),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+                
                 fig_timeline.update_layout(
-                    height=250,
-                    paper_bgcolor='rgba(30, 41, 59, 0.5)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='white'),
-                    xaxis=dict(showgrid=False, title=""),
-                    yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)', title="Articles"),
-                    margin=dict(l=0, r=0, t=20, b=0)
+                    height=300,
+                    paper_bgcolor='rgba(15, 23, 42, 0.8)',
+                    plot_bgcolor='rgba(30, 41, 59, 0.5)',
+                    font=dict(color='#e0e7ff', size=12),
+                    xaxis=dict(
+                        showgrid=True,
+                        gridcolor='rgba(96, 165, 250, 0.1)',
+                        title="",
+                        tickfont=dict(color='#cbd5e1')
+                    ),
+                    yaxis=dict(
+                        showgrid=True,
+                        gridcolor='rgba(96, 165, 250, 0.15)',
+                        title="Articles Collected",
+                        titlefont=dict(color='#cbd5e1', size=13),
+                        tickfont=dict(color='#e0e7ff')
+                    ),
+                    margin=dict(l=60, r=40, t=30, b=40),
+                    hovermode='x unified',
+                    hoverlabel=dict(
+                        bgcolor='#1e293b',
+                        font_size=12,
+                        font_color='#e0e7ff'
+                    )
                 )
                 st.plotly_chart(fig_timeline, use_container_width=True)
         except:
