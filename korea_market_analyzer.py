@@ -255,7 +255,7 @@ def get_recommended_stocks(sectors: List[str], direction: str) -> List[Dict]:
     return unique_recs[:10]  # 최대 10개
 
 
-def analyze_news_batch(articles: List[Dict], use_ai: bool = True, rate_limit_delay: float = 5.0) -> List[Dict]:
+def analyze_news_batch(articles: List[Dict], use_ai: bool = True, rate_limit_delay: float = 15.0) -> List[Dict]:
     """
     여러 뉴스 기사를 배치로 분석합니다.
     
