@@ -133,7 +133,7 @@ def load_reports():
 # =============================================================================
 # 메인 레이아웃
 # =============================================================================
-st.title("🌍 Global Well-Dying Archive")
+st.title("💰 오늘을 위한 경제픽")
 st.caption("AI-Powered News Monitoring & Intelligence System (v3.3)")
 st.markdown("---")
 
