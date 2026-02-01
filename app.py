@@ -64,11 +64,11 @@ def get_flag_emoji(country):
     }
     return mapping.get(country, '🌍')
 
-def trigger_github_action():
+def trigger_github_action(workflow_id: str = "morning_briefing.yml"):
+    """GitHub Actions 워크플로우 트리거"""
     token = os.getenv("GITHUB_PAT")
-    owner = os.getenv("GITHUB_OWNER", "your-username")
-    repo = os.getenv("GITHUB_REPO", "global-well-dying-archive")
-    workflow_id = "daily_pipeline.yml"
+    owner = os.getenv("GITHUB_OWNER", "ggidoong1-dot")
+    repo = os.getenv("GITHUB_REPO", "econews")
     
     if not token: return False, "❌ GITHUB_PAT 환경변수가 설정되지 않았습니다."
     
@@ -79,6 +79,15 @@ def trigger_github_action():
     try:
         response = requests.post(url, headers=headers, json=data, timeout=10)
         return (True, "🚀 워크플로우 시작됨!") if response.status_code == 204 else (False, f"❌ 실패 ({response.status_code})")
+    except Exception as e:
+        return False, f"❌ 에러: {str(e)}"
+
+def run_morning_briefing_local():
+    """로컬에서 모닝 브리핑 실행 (Streamlit Cloud용)"""
+    try:
+        from morning_briefing import generate_morning_briefing
+        briefing = generate_morning_briefing()
+        return True, briefing
     except Exception as e:
         return False, f"❌ 에러: {str(e)}"
 
@@ -262,11 +271,39 @@ with tab_reports:
 
 with tab_admin:
     st.markdown("### ⚙️ System Management")
-    with st.expander("☁️ Remote Collection"):
-        if st.button("⚡ Run Collector", type="primary"):
-            s, m = trigger_github_action()
+    
+    # 모닝 브리핑 섹션
+    st.markdown("#### 📊 모닝 브리핑")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🌅 모닝 브리핑 실행 (로컬)", type="primary", use_container_width=True):
+            with st.spinner("브리핑 생성 중... (약 30초 소요)"):
+                success, result = run_morning_briefing_local()
+                if success:
+                    st.success("✅ 브리핑 생성 완료!")
+                    st.text_area("브리핑 내용", result, height=400)
+                else:
+                    st.error(result)
+    
+    with col2:
+        if st.button("☁️ GitHub Actions 트리거", use_container_width=True):
+            s, m = trigger_github_action("morning_briefing.yml")
             if s: st.success(m)
             else: st.error(m)
+    
+    st.markdown("---")
+    
+    # 뉴스 수집 섹션
+    with st.expander("📡 뉴스 수집 (Collector)"):
+        if st.button("⚡ Run Collector", type="secondary"):
+            from collector import run_collector
+            with st.spinner("수집 중..."):
+                try:
+                    result = run_collector()
+                    st.success(f"✅ 수집 완료: {result.get('inserted', 0)}개 저장")
+                except Exception as e:
+                    st.error(f"❌ 수집 실패: {e}")
     
     c1, c2 = st.columns(2)
     with c1:
