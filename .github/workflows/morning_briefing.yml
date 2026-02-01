@@ -1,0 +1,49 @@
+name: Morning Briefing
+
+on:
+  schedule:
+    # 오전 8시 KST (UTC 23:00 전날)
+    - cron: '0 23 * * *'
+  workflow_dispatch:  # 수동 실행 가능
+
+env:
+  GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run Morning Briefing
+        run: |
+          echo "🌅 모닝 브리핑 실행 시작 - $(TZ=Asia/Seoul date)"
+          python morning_briefing.py
+        env:
+          TZ: Asia/Seoul
+      
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: briefing-logs
+          path: logs/
+          retention-days: 7
