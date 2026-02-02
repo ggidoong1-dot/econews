@@ -19,6 +19,28 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 NEWSAPI_KEY = os.getenv("NEWSAPI_KEY", "")  # 선택사항
 
 # ==============================================
+# Groq API 설정 (NEW - 새벽 뉴스 분석용)
+# ==============================================
+# Groq API 키 (https://console.groq.com 에서 발급)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# Groq 모델 설정
+# - llama-3.3-70b-versatile: 심층 분석용 (280 TPS, 정확)
+# - llama-3.1-8b-instant: 빠른 필터링용 (560 TPS, 저렴)
+GROQ_MODEL_DEEP = os.getenv("GROQ_MODEL_DEEP", "llama-3.3-70b-versatile")
+GROQ_MODEL_FAST = os.getenv("GROQ_MODEL_FAST", "llama-3.1-8b-instant")
+
+# Groq Rate Limit 설정 (Free tier: 30 RPM, 14,400 RPD)
+GROQ_RATE_LIMIT_DELAY_FAST = 2.0  # 8b 모델 호출 간 대기 (초)
+GROQ_RATE_LIMIT_DELAY_DEEP = 4.0  # 70b 모델 호출 간 대기 (초)
+
+# AI 분석 모드 선택
+# "groq": Groq API 사용 (새벽 대량 분석에 추천)
+# "gemini": Google Gemini 사용 (기존 방식)
+# "auto": Groq 우선, 실패 시 Gemini 폴백
+AI_ANALYZER_MODE = os.getenv("AI_ANALYZER_MODE", "auto")
+
+# ==============================================
 # Gemini API 설정 (2026년 최신 버전)
 # ==============================================
 # ✅ gemini-2.5-flash: 2026년 안정 버전 (빠르고 저렴)
@@ -52,6 +74,34 @@ KEYWORDS_KO = [
     "안락사",
     "존엄사",
     "의사조력자살"
+]
+
+# ==============================================
+# 일본어 키워드 (일본 경제 뉴스)
+# ==============================================
+KEYWORDS_JA = [
+    # 경제/금융
+    "経済", "株式", "金利", "日銀", "円安", "円高",
+    "インフレ", "デフレ", "景気",
+    # 산업
+    "半導体", "電気自動車", "バッテリー", "AI", "人工知能",
+    # 무역/한국 관련
+    "輸出", "輸入", "貿易", "関税",
+    "韓国", "サムスン", "現代自動車", "韓国経済"
+]
+
+# ==============================================
+# 중국어 키워드 (중국 경제 뉴스)
+# ==============================================
+KEYWORDS_ZH = [
+    # 경제/금융
+    "经济", "股市", "股票", "利率", "人民币", "通胀",
+    # 산업
+    "半导体", "芯片", "电动汽车", "电池", "新能源",
+    "人工智能",
+    # 무역/한국 관련
+    "贸易", "关税", "出口", "进口",
+    "韩国", "三星", "现代汽车", "SK海力士"
 ]
 
 # ==============================================
@@ -219,20 +269,50 @@ FINANCE_RSS_SOURCES = [
         "country": "US",
         "category": "tech"
     },
-    # 아시아 뉴스
+    # 아시아 뉴스 (확장)
     {
         "url": "https://www3.nhk.or.jp/rss/news/cat5.xml",
         "name": "NHK Business",
         "country": "Japan",
-        "category": "finance"
+        "category": "finance",
+        "lang": "ja"
     },
     {
         "url": "https://www.scmp.com/rss/91/feed",
         "name": "SCMP Business",
         "country": "China/HK",
-        "category": "finance"
+        "category": "finance",
+        "lang": "en"  # 영문 제공
+    },
+    {
+        "url": "https://www.scmp.com/rss/5/feed",
+        "name": "SCMP China",
+        "country": "China",
+        "category": "economy",
+        "lang": "en"
+    },
+    {
+        "url": "https://asia.nikkei.com/rss/feed/nar",
+        "name": "Nikkei Asia",
+        "country": "Japan",
+        "category": "finance",
+        "lang": "en"
+    },
+    {
+        "url": "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511",
+        "name": "CNA Business",
+        "country": "Singapore",
+        "category": "finance",
+        "lang": "en"
     },
 ]
+
+# ==============================================
+# Slack 알림 설정
+# ==============================================
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
+SLACK_ENABLED = bool(SLACK_WEBHOOK_URL)
+SLACK_DEFAULT_CHANNEL = os.getenv("SLACK_CHANNEL", "#news-alerts")
 
 # ==============================================
 # 한국 시장 영향 분석용 키워드 (신규)

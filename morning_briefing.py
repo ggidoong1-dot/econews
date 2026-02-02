@@ -1,7 +1,7 @@
 """
-모닝 브리핑 생성기
-오전 8시에 실행되어 전날 미국 마감 후 뉴스를 분석하고
-한국 주식시장 영향 브리핑을 생성합니다.
+모닝 브리핑 생성기 (v2.0)
+오전 8시 30분에 실행되어 전날 미국 마감 후 뉴스와
+투자 리포트를 분석하고 한국 주식시장 영향 브리핑을 생성합니다.
 """
 import asyncio
 from datetime import datetime, timezone, timedelta
@@ -13,6 +13,10 @@ logger = config.setup_logger(__name__)
 # 모듈 임포트
 from collectors.finance_rss import fetch_finance_rss_all
 from collectors.market_indicators import get_key_indicators, get_risk_level, format_market_summary
+from collectors.report_collector import (
+    collect_all_reports,
+    format_reports_for_briefing
+)
 from korea_market_analyzer import (
     analyze_news_batch,
     filter_high_impact_news,
@@ -64,7 +68,22 @@ def generate_morning_briefing() -> str:
     
     sections.append("\n---\n")
     
-    # 2. 경제 뉴스 수집 및 분석
+    # 2. 투자 리포트 수집
+    logger.info("📊 투자 리포트 수집...")
+    try:
+        reports = collect_all_reports()
+        report_section = format_reports_for_briefing(reports)
+        if report_section and report_section != "리포트 정보 없음":
+            sections.append(report_section)
+        else:
+            sections.append("\n⚠️ 리포트 수집 정보 없음")
+    except Exception as e:
+        logger.error(f"리포트 수집 오류: {e}")
+        sections.append("\n⚠️ 리포트 수집 중 오류 발생")
+    
+    sections.append("\n---\n")
+    
+    # 3. 경제 뉴스 수집 및 분석
     logger.info("📰 경제 뉴스 수집...")
     try:
         articles = fetch_finance_rss_all()

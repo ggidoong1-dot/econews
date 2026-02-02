@@ -1,24 +1,32 @@
-name: Morning Briefing
+name: Night News Collection
 
 on:
   schedule:
-    # 오전 8시 30분 KST (UTC 23:30 전날)
-    - cron: '30 23 * * *'
+    # 새벽 시간대 매시간 실행 (KST 0시~6시 = UTC 15:00~21:00)
+    - cron: '0 15 * * *'  # KST 0시
+    - cron: '0 16 * * *'  # KST 1시
+    - cron: '0 17 * * *'  # KST 2시
+    - cron: '0 18 * * *'  # KST 3시
+    - cron: '0 19 * * *'  # KST 4시
+    - cron: '0 20 * * *'  # KST 5시
+    - cron: '0 21 * * *'  # KST 6시
   workflow_dispatch:  # 수동 실행 가능
+    inputs:
+      hours_back:
+        description: '수집할 시간 범위 (시간)'
+        required: false
+        default: '4'
 
 env:
   GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
   GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-  AI_ANALYZER_MODE: auto
 
 jobs:
-  briefing:
+  collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     
     steps:
       - name: Checkout repository
@@ -35,10 +43,10 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
       
-      - name: Run Morning Briefing
+      - name: Run Night Collection
         run: |
-          echo "🌅 모닝 브리핑 실행 시작 - $(TZ=Asia/Seoul date)"
-          python morning_briefing.py
+          echo "🌙 새벽 뉴스 수집 시작 - $(TZ=Asia/Seoul date)"
+          python scripts/run_night_collect.py --hours-back ${{ github.event.inputs.hours_back || '4' }}
         env:
           TZ: Asia/Seoul
       
@@ -46,6 +54,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: briefing-logs
+          name: night-collect-logs
           path: logs/
           retention-days: 7

@@ -1,24 +1,32 @@
-name: Morning Briefing
+name: AI Analysis Pipeline
 
 on:
   schedule:
-    # 오전 8시 30분 KST (UTC 23:30 전날)
-    - cron: '30 23 * * *'
+    # 오전 6시 30분 KST (UTC 21:30 전날)
+    # 새벽 수집된 뉴스를 분석하여 모닝 브리핑 준비
+    - cron: '30 21 * * *'
   workflow_dispatch:  # 수동 실행 가능
+    inputs:
+      use_groq:
+        description: 'Groq AI 사용 여부'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 env:
   GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
   GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
   AI_ANALYZER_MODE: auto
 
 jobs:
-  briefing:
+  analyze:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     
     steps:
       - name: Checkout repository
@@ -35,10 +43,10 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
       
-      - name: Run Morning Briefing
+      - name: Run AI Analysis
         run: |
-          echo "🌅 모닝 브리핑 실행 시작 - $(TZ=Asia/Seoul date)"
-          python morning_briefing.py
+          echo "🤖 AI 분석 파이프라인 시작 - $(TZ=Asia/Seoul date)"
+          python scripts/run_analysis.py
         env:
           TZ: Asia/Seoul
       
@@ -46,6 +54,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: briefing-logs
+          name: analysis-logs
           path: logs/
           retention-days: 7

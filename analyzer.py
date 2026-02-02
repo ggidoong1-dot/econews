@@ -1,7 +1,8 @@
 """
-AI 분석기 (v3.0)
+AI 분석기 (v3.1)
 Gemini 2.5 Flash를 사용하여 뉴스 기사 분석
 429 에러 시 무료 번역 라이브러리로 폴백
+다국어 지원 강화 (한국어, 일본어, 중국어)
 """
 import os
 import time
@@ -18,28 +19,81 @@ import database as db
 logger = config.setup_logger(__name__)
 
 # ==============================================
-# 폴백 번역 함수 (Gemini 429 시 사용)
+# 상수 정의
 # ==============================================
-def fallback_translate(title: str) -> Optional[Dict]:
+AI_COOLDOWN_DEFAULT = 20  # 기본 대기 시간 (초)
+AI_COOLDOWN_MIN = 10      # 최소 대기 시간 (초)
+AI_COOLDOWN_MAX = 30      # 최대 대기 시간 (초)
+MAX_RETRIES = 3           # 최대 재시도 횟수
+# ==============================================
+# 적응형 대기 시간 함수
+# ==============================================
+def get_adaptive_delay(success_count: int, fail_count: int) -> float:
+    """
+    성공/실패 비율에 따른 적응형 대기 시간 반환
+    
+    Args:
+        success_count: 성공한 요청 수
+        fail_count: 실패한 요청 수
+        
+    Returns:
+        float: 대기 시간 (초)
+    """
+    total = success_count + fail_count
+    if total == 0:
+        return AI_COOLDOWN_DEFAULT
+    
+    fail_ratio = fail_count / total
+    
+    if fail_ratio > 0.3:
+        return AI_COOLDOWN_MAX  # 실패율 높으면 보수적
+    elif fail_ratio > 0.1:
+        return AI_COOLDOWN_DEFAULT
+    else:
+        return AI_COOLDOWN_MIN  # 성공율 높으면 빠르게
+
+
+# ==============================================
+# 폴백 번역 함수 (Gemini 429 시 사용) - 다국어 지원
+# ==============================================
+def fallback_translate(title: str, target_lang: str = 'ko') -> Optional[Dict]:
     """
     Gemini API가 429 에러 시 무료 번역 라이브러리 사용
     deep-translator (Google Translate 무료) 사용
+    
+    Args:
+        title: 번역할 제목
+        target_lang: 대상 언어 코드 ('ko', 'ja', 'zh-CN')
+        
+    Returns:
+        Dict: 번역 결과 또는 None
     """
     try:
         from deep_translator import GoogleTranslator
         
-        # 제목 번역
-        translator = GoogleTranslator(source='auto', target='ko')
-        title_ko = translator.translate(title)
+        # 언어 코드 매핑
+        lang_map = {
+            'ko': 'ko',
+            'ja': 'ja', 
+            'zh': 'zh-CN',
+            'zh-CN': 'zh-CN',
+            'en': 'en'
+        }
+        target = lang_map.get(target_lang, 'ko')
         
-        logger.info(f"   🔄 폴백 번역 사용: {title_ko[:50]}...")
+        # 제목 번역
+        translator = GoogleTranslator(source='auto', target=target)
+        title_translated = translator.translate(title)
+        
+        logger.info(f"   🔄 폴백 번역 ({target_lang}): {title_translated[:50]}...")
         
         return {
-            "title_ko": title_ko,
-            "summary": "- AI 분석 대기 중 (Gemini 할당량 초과)\n- 번역만 완료됨\n- 나중에 재분석 필요",
+            "title_ko": title_translated if target_lang == 'ko' else title,
+            f"title_{target_lang}": title_translated,
+            "summary": f"- AI 분석 대기 중 (Gemini 할당량 초과)\n- 번역만 완료됨 ({target_lang})\n- 나중에 재분석 필요",
             "category": "Uncategorized",
             "sentiment": "Neutral",
-            "is_fallback": True  # 폴백 사용 표시
+            "is_fallback": True
         }
     except ImportError:
         logger.error("❌ deep-translator가 설치되지 않았습니다. pip install deep-translator")
@@ -233,7 +287,7 @@ def extract_content_from_description(description: str, max_length: int = 1000) -
 
 def run_analyzer(batch_size: int = 10):
     logger.info("=" * 60)
-    logger.info("🤖 AI 분석기 시작 (v3.0)")
+    logger.info("🤖 AI 분석기 시작 (v3.1 - 적응형 대기)")
     logger.info(f"   모델: {config.GEMINI_MODEL}")
     logger.info("=" * 60)
     
@@ -274,10 +328,10 @@ def run_analyzer(batch_size: int = 10):
             logger.warning("   ⚠️ 분석 실패 (API 오류 등)")
             fail_count += 1
             
-        # API 쿨타임 (속도 조절)
-        # [수정됨] 20초 대기로 변경 (안전성 최우선)
-        logger.info("   ☕ 20초 휴식... (API 과부하 방지)")
-        time.sleep(20)
+        # API 쿨타임 (적응형 대기 시간)
+        delay = get_adaptive_delay(success_count, fail_count)
+        logger.info(f"   ☕ {delay:.0f}초 휴식... (적응형 대기)")
+        time.sleep(delay)
 
     logger.info("\n" + "=" * 60)
     logger.info(f"📊 최종 결과: 성공 {success_count} / 실패 {fail_count}")

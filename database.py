@@ -14,6 +14,12 @@ import config
 # 로거 설정
 logger = config.setup_logger(__name__)
 
+# ==============================================
+# 상수 정의
+# ==============================================
+DEFAULT_FALLBACK_DATE = datetime(2000, 1, 1, tzinfo=timezone.utc)
+DEFAULT_FALLBACK_DATE_STR = "2000-01-01T00:00:00+00:00"
+
 # 실패 기사 기록 파일
 FAILED_ARTICLES_LOG = os.path.join(config.LOG_DIR, "failed_articles.jsonl")
 
@@ -280,8 +286,9 @@ def should_run_collector() -> bool:
             last_run = date_parser.parse(last_run_str)
             if last_run.tzinfo is None:
                 last_run = last_run.replace(tzinfo=timezone.utc)
-        except:
-            last_run = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        except Exception as e:
+            logger.warning(f"마지막 실행 시간 파싱 실패: {e}")
+            last_run = DEFAULT_FALLBACK_DATE
             
         interval_minutes = int(settings.get('interval_minutes', config.DEFAULT_COLLECTION_INTERVAL))
         elapsed_minutes = (datetime.now(timezone.utc) - last_run).total_seconds() / 60
@@ -348,7 +355,8 @@ def save_news_batch(news_list: List[Dict]) -> int:
             try:
                 existing = db.table("news").select("link").in_("link", chunk_links).execute()
                 existing_links = {item['link'] for item in existing.data}
-            except:
+            except Exception as e:
+                logger.warning(f"중복 링크 조회 실패: {e}")
                 existing_links = set()
             
             # 3. 신규 기사 필터링
@@ -460,7 +468,8 @@ def get_statistics(days: int = 7) -> Dict:
             for item in sources_resp.data:
                 source_counts[item.get('source', 'Unknown')] += 1
             sources_data = [{"source": k, "count": v} for k, v in source_counts.items()]
-        except:
+        except Exception as e:
+            logger.debug(f"소스별 통계 조회 실패: {e}")
             sources_data = []
         
         return {
@@ -473,6 +482,80 @@ def get_statistics(days: int = 7) -> Dict:
     except Exception as e:
         logger.error(f"통계 에러: {e}")
         return {"total_articles": 0, "processed_articles": 0, "processing_rate": 0, "sources": []}
+
+
+def get_collection_quality_metrics(days: int = 1) -> Dict:
+    """
+    수집 품질 메트릭을 반환합니다.
+    
+    Args:
+        days: 조회 기간 (일)
+        
+    Returns:
+        Dict: 품질 메트릭 정보
+    """
+    try:
+        db = ensure_connection()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        
+        # 전체 수집 기사 수
+        total_resp = db.table("news").select("id", count="exact").gte("created_at", cutoff).execute()
+        total_count = total_resp.count or 0
+        
+        # 분석 완료 기사 수
+        processed_resp = db.table("news").select("id", count="exact")\
+            .gte("created_at", cutoff)\
+            .eq("is_processed", True)\
+            .execute()
+        processed_count = processed_resp.count or 0
+        
+        # 고품질 기사 수 (quality_score >= 70)
+        high_quality_resp = db.table("news").select("id", count="exact")\
+            .gte("created_at", cutoff)\
+            .gte("quality_score", 70)\
+            .execute()
+        high_quality_count = high_quality_resp.count or 0
+        
+        # 소스별 성공률 계산
+        sources_resp = db.table("news").select("source").gte("created_at", cutoff).execute()
+        source_counts = defaultdict(int)
+        for item in sources_resp.data:
+            source_counts[item.get('source', 'Unknown')] += 1
+        
+        # 소스 상태 평가
+        source_health = {}
+        for source, count in source_counts.items():
+            if count >= 10:
+                source_health[source] = {"status": "healthy", "count": count}
+            elif count >= 5:
+                source_health[source] = {"status": "warning", "count": count}
+            else:
+                source_health[source] = {"status": "critical", "count": count}
+        
+        return {
+            "period_days": days,
+            "total_collected": total_count,
+            "total_processed": processed_count,
+            "high_quality_count": high_quality_count,
+            "success_rate": round((processed_count / total_count * 100) if total_count > 0 else 0, 1),
+            "quality_rate": round((high_quality_count / processed_count * 100) if processed_count > 0 else 0, 1),
+            "source_health": source_health,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"품질 메트릭 조회 실패: {e}")
+        return {
+            "period_days": days,
+            "total_collected": 0,
+            "total_processed": 0,
+            "high_quality_count": 0,
+            "success_rate": 0,
+            "quality_rate": 0,
+            "source_health": {},
+            "error": str(e)
+        }
+
 
 if __name__ == "__main__":
     # 간단 테스트

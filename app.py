@@ -1,5 +1,5 @@
 """
-Streamlit 대시보드 (v3.3) - 표(Table) 중심 뷰 (수정본)
+Streamlit 대시보드 (v3.4) - 품질 모니터링 추가
 Well-Dying Archive 관리 및 모니터링
 """
 import streamlit as st
@@ -137,7 +137,7 @@ st.title("💰 오늘을 위한 경제픽")
 st.caption("AI-Powered News Monitoring & Intelligence System (v3.3)")
 st.markdown("---")
 
-tab_feed, tab_ai, tab_reports, tab_admin = st.tabs(["📋 News Feed", "🤖 AI Insights", "📊 Daily Reports", "⚙️ Management"])
+tab_feed, tab_ai, tab_reports, tab_quality, tab_admin = st.tabs(["📋 News Feed", "🤖 AI Insights", "📊 Daily Reports", "📈 Quality Monitor", "⚙️ Management"])
 df = pd.DataFrame()
 
 # =============================================================================
@@ -268,6 +268,69 @@ with tab_reports:
         for r in reports:
             with st.expander(f"📢 {r.get('report_date')}"):
                 st.markdown(r['content'])
+
+# =============================================================================
+# TAB 4: Quality Monitor (신규)
+# =============================================================================
+with tab_quality:
+    st.markdown("### 📈 수집 품질 모니터링")
+    st.caption("뉴스 수집 및 분석 시스템의 건강 상태를 모니터링합니다.")
+    
+    # 품질 메트릭 로드
+    try:
+        metrics = db.get_collection_quality_metrics(days=1)
+        
+        # 주요 지표
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric(
+            "📥 24시간 수집량", 
+            f"{metrics.get('total_collected', 0):,}건",
+            help="최근 24시간 동안 수집된 총 기사 수"
+        )
+        col2.metric(
+            "✅ 분석 완료", 
+            f"{metrics.get('total_processed', 0):,}건",
+            delta=f"{metrics.get('success_rate', 0):.1f}%"
+        )
+        col3.metric(
+            "⭐ 고품질 기사", 
+            f"{metrics.get('high_quality_count', 0):,}건",
+            delta=f"{metrics.get('quality_rate', 0):.1f}%"
+        )
+        
+        # 시스템 상태
+        source_health = metrics.get('source_health', {})
+        healthy_count = sum(1 for s in source_health.values() if s.get('status') == 'healthy')
+        total_sources = len(source_health)
+        system_status = "🟢 정상" if healthy_count >= total_sources * 0.7 else "🟡 주의" if healthy_count >= total_sources * 0.3 else "🔴 경고"
+        col4.metric("🔧 시스템 상태", system_status)
+        
+        st.markdown("---")
+        
+        # 소스별 상태
+        st.markdown("#### 📡 뉴스 소스 상태")
+        if source_health:
+            source_data = []
+            for source, info in source_health.items():
+                status = info.get('status', 'unknown')
+                status_emoji = {"healthy": "🟢", "warning": "🟡", "critical": "🔴"}.get(status, "⚪")
+                source_data.append({
+                    "소스": source,
+                    "상태": f"{status_emoji} {status.upper()}",
+                    "수집량": info.get('count', 0)
+                })
+            
+            source_df = pd.DataFrame(source_data)
+            st.dataframe(source_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("소스 상태 정보가 없습니다.")
+        
+        # 마지막 업데이트 시간
+        st.caption(f"🕒 마지막 업데이트: {metrics.get('timestamp', 'N/A')}")
+        
+    except Exception as e:
+        st.error(f"품질 메트릭 로드 실패: {e}")
+        st.info("💡 database.py의 get_collection_quality_metrics() 함수가 필요합니다.")
 
 with tab_admin:
     st.markdown("### ⚙️ System Management")
