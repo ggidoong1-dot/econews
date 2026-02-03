@@ -368,9 +368,13 @@ with tab_admin:
                 except Exception as e:
                     st.error(f"❌ 수집 실패: {e}")
     
-    with c2:
+    # Ban Words 섹션
+    with st.expander("🚫 Ban Words"):
         st.markdown("#### Ban Words")
-        st.dataframe(pd.DataFrame(db.get_ban_words(), columns=["Ban Word"]), use_container_width=True)
+        try:
+            st.dataframe(pd.DataFrame(db.get_ban_words(), columns=["Ban Word"]), use_container_width=True)
+        except Exception as e:
+            st.error(f"Ban Words 로드 실패: {e}")
 
     st.markdown("---")
     
