@@ -368,10 +368,41 @@ with tab_admin:
                 except Exception as e:
                     st.error(f"❌ 수집 실패: {e}")
     
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("#### Keywords")
-        st.dataframe(pd.DataFrame(db.get_keywords(), columns=["Keyword"]), use_container_width=True)
     with c2:
         st.markdown("#### Ban Words")
         st.dataframe(pd.DataFrame(db.get_ban_words(), columns=["Ban Word"]), use_container_width=True)
+
+    st.markdown("---")
+    
+    # 전체 파이프라인 실행 버튼 (New)
+    st.markdown("### 🚀 전체 파이프라인 가동")
+    st.caption("수집 → 일반 AI 분석 → 모닝 브리핑 생성을 한 번에 실행합니다.")
+    
+    if st.button("🔥 전체 파이프라인 실행 (All-in-One)", type="primary", use_container_width=True):
+        status_container = st.container()
+        with status_container:
+            try:
+                # 1. 뉴스 수집
+                with st.spinner("📡 1단계: 뉴스 수집 중..."):
+                    from collector import run_collector
+                    stats = run_collector()
+                    st.success(f"✅ 수집 완료: {stats.get('insert_success', 0)}개 신규 저장")
+                
+                # 2. 일반 AI 분석
+                with st.spinner("🤖 2단계: 일반 AI 분석 중... (최대 20개)"):
+                    import analyzer
+                    analyzer.run_analyzer(batch_size=20)
+                    st.success("✅ 일반 AI 분석 완료")
+                    
+                # 3. 모닝 브리핑 생성
+                with st.spinner("🌅 3단계: 모닝 브리핑(한국 시장 분석) 생성 중..."):
+                    from morning_briefing import generate_morning_briefing
+                    briefing = generate_morning_briefing()
+                    st.success("✅ 모닝 브리핑 생성 완료!")
+                
+                st.balloons()
+                st.markdown("#### 📄 생성된 브리핑")
+                st.text_area("Briefing Result", briefing, height=400)
+                
+            except Exception as e:
+                st.error(f"❌ 파이프라인 실행 중 오류 발생: {e}")
