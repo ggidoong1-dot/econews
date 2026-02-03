@@ -29,10 +29,18 @@ FAILED_ARTICLES_LOG = os.path.join(config.LOG_DIR, "failed_articles.jsonl")
 supabase: Optional[Client] = None
 
 try:
-    if not config.SUPABASE_URL or not config.SUPABASE_KEY:
+    # 디버깅: 환경변수가 로드됐는지 확인
+    url = config.SUPABASE_URL
+    key = config.SUPABASE_KEY
+    
+    logger.info(f"🔑 Supabase 설정 확인:")
+    logger.info(f"   - URL: {url[:30] if url else 'NOT SET'}...")
+    logger.info(f"   - KEY: {key[:20] if key else 'NOT SET'}...")
+    
+    if not url or not key:
         raise ValueError("Supabase 설정 누락: SUPABASE_URL 또는 SUPABASE_KEY가 없습니다.")
 
-    supabase = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+    supabase = create_client(url, key)
     logger.info("✅ Supabase 연결 성공")
 except ValueError as e:
     logger.error(f"❌ Supabase 설정 오류: {e}")
