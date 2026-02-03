@@ -375,10 +375,10 @@ def save_news_batch(news_list: List[Dict]) -> int:
             # 4. DB 저장
             if new_news:
                 try:
-                    # 필요한 컬럼만 추출
+                    # 필요한 컬럼만 추출 (Supabase 테이블 스키마와 일치해야 함)
                     allowed_columns = {
                         'title', 'link', 'description', 'published_at', 'source', 'country',
-                        'author', 'content_hash', 'is_processed', 'collected_at',
+                        'author', 'is_processed',
                         'summary_ai', 'title_ko', 'category', 'sentiment', 'quality_score'
                     }
                     cleaned_batch = []
