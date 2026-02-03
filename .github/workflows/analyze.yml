@@ -46,9 +46,11 @@ jobs:
       - name: Run AI Analysis
         run: |
           echo "🤖 AI 분석 파이프라인 시작 - $(TZ=Asia/Seoul date)"
-          python scripts/run_analysis.py
+          python morning_briefing.py
         env:
           TZ: Asia/Seoul
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       
       - name: Upload logs on failure
         if: failure()
