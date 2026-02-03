@@ -383,17 +383,27 @@ def save_news_batch(news_list: List[Dict]) -> int:
                     logger.info(f"   [{chunk_num}/{total_chunks}] ✅ {len(result.data)}개 저장 완료")
                     
                 except Exception as insert_error:
-                    logger.warning(f"   [{chunk_num}/{total_chunks}] ⚠️ 배치 저장 실패 -> 개별 저장 시도")
+                    logger.warning(f"   [{chunk_num}/{total_chunks}] ⚠️ 배치 저장 실패: {insert_error}")
                     
                     # 개별 저장 모드 (Fallback)
                     chunk_saved = 0
+                    chunk_failed = 0
                     for article in new_news:
                         try:
                             cleaned = {k: v for k, v in article.items() if k in allowed_columns}
                             db.table("news").insert([cleaned]).execute()
                             chunk_saved += 1
                         except Exception as e:
+                            chunk_failed += 1
+                            # 처음 3개의 에러만 상세 로그
+                            if chunk_failed <= 3:
+                                logger.error(f"      ❌ 개별 저장 실패: {e}")
                             log_failed_article(article, str(e), "INSERT_FAILED")
+                    
+                    if chunk_saved > 0:
+                        logger.info(f"      → 개별 저장 결과: {chunk_saved}개 성공, {chunk_failed}개 실패")
+                    else:
+                        logger.error(f"      → 개별 저장 모두 실패! ({chunk_failed}개)")
                     
                     saved_count += chunk_saved
                     save_failed_count += (len(new_news) - chunk_saved)
